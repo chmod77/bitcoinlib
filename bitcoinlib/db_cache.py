@@ -62,7 +62,13 @@ class DbInit:
                 db_uri += "?"
             db_uri += "check_same_thread=False"
 
-        self.engine = create_engine(db_uri, isolation_level='READ UNCOMMITTED')
+            self.engine = create_engine(
+            db_uri,
+            isolation_level="READ UNCOMMITTED",
+            echo=True,
+            pool_size=6,
+            max_overflow=20,
+        )
         Session = sessionmaker(bind=self.engine)
         Base.metadata.create_all(self.engine)
         self.session = Session()
