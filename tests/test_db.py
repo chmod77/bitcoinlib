@@ -19,34 +19,57 @@
 #
 
 import unittest
-from tests.db_0_4_10 import DbInit as DbInitOld
+from sqlalchemy.exc import OperationalError
+from tests.db_0_5 import Db as DbInitOld
 from bitcoinlib.db import *
+from bitcoinlib.db_cache import *
+from bitcoinlib.wallets import Wallet, WalletError
+from bitcoinlib.services.services import Service
 
 
 DATABASEFILE_UNITTESTS = os.path.join(str(BCL_DATABASE_DIR), 'bitcoinlib.unittest.sqlite')
+DATABASEFILE_TMP = os.path.join(str(BCL_DATABASE_DIR), 'bitcoinlib.tmp.sqlite')
+DATABASEFILE_CACHE_TMP = os.path.join(str(BCL_DATABASE_DIR), 'bitcoinlib_cache.tmp.sqlite')
 
 
 class TestDb(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        if os.path.isfile(DATABASEFILE_TMP):
+            os.remove(DATABASEFILE_TMP)
+        if os.path.isfile(DATABASEFILE_CACHE_TMP):
+            os.remove(DATABASEFILE_CACHE_TMP)
 
     def test_database_upgrade(self):
         if os.path.isfile(DATABASEFILE_UNITTESTS):
             os.remove(DATABASEFILE_UNITTESTS)
         dbold = DbInitOld(DATABASEFILE_UNITTESTS)
 
-        self.assertFalse('latest_txid' in dbold.engine.execute("SELECT * FROM keys").keys())
-        self.assertFalse('address' in dbold.engine.execute("SELECT * FROM transaction_inputs").keys())
-        version_db = dbold.session.query(DbConfig.value).filter_by(variable='version').scalar()
-        self.assertEqual(version_db, '0.4.10')
+        # self.assertFalse('latest_txid' in dbold.engine.execute("SELECT * FROM keys").keys())
+        # self.assertFalse('address' in dbold.engine.execute("SELECT * FROM transaction_inputs").keys())
+        # version_db = dbold.session.query(DbConfig.value).filter_by(variable='version').scalar()
+        # self.assertEqual(version_db, '0.4.10')
 
-        db_update(dbold, version_db, '0.4.11')
-        self.assertTrue('latest_txid' in dbold.engine.execute("SELECT * FROM keys").keys())
-        version_db = dbold.session.query(DbConfig.value).filter_by(variable='version').scalar()
-        self.assertEqual(version_db, '0.4.11')
+    def test_database_create_drop(self):
+        dbtmp = Db(DATABASEFILE_TMP)
+        Wallet.create("tmpwallet", db_uri=DATABASEFILE_TMP)
+        self.assertRaisesRegexp(WalletError, "Wallet with name 'tmpwallet' already exists",
+                                Wallet.create, 'tmpwallet', db_uri=DATABASEFILE_TMP)
+        dbtmp.drop_db(yes_i_am_sure=True)
+        Wallet.create("tmpwallet", db_uri=DATABASEFILE_TMP)
 
-        db_update(dbold, version_db, '0.4.12')
-        self.assertTrue('address' in dbold.engine.execute("SELECT * FROM transaction_inputs").keys())
-        version_db = dbold.session.query(DbConfig.value).filter_by(variable='version').scalar()
-        self.assertEqual(version_db, '0.4.12')
+    def test_database_cache_create_drop(self):
+        dbtmp = DbCache(DATABASEFILE_CACHE_TMP)
+        srv = Service(cache_uri=DATABASEFILE_CACHE_TMP, exclude_providers=['bitaps', 'bitgo'])
+        t = srv.gettransaction('68104dbd6819375e7bdf96562f89290b41598df7b002089ecdd3c8d999025b13')
+        if t:
+            self.assertGreaterEqual(srv.results_cache_n, 0)
+            srv.gettransaction('68104dbd6819375e7bdf96562f89290b41598df7b002089ecdd3c8d999025b13')
+            self.assertGreaterEqual(srv.results_cache_n, 1)
+            dbtmp.drop_db()
+            self.assertRaisesRegex(OperationalError, "", srv.gettransaction,
+                                   '68104dbd6819375e7bdf96562f89290b41598df7b002089ecdd3c8d999025b13')
 
 
 if __name__ == '__main__':

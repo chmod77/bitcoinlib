@@ -2,7 +2,7 @@
 #
 #    BitcoinLib - Python Cryptocurrency Library
 #    Unit Tests for Key, Encoding and Mnemonic Class
-#    © 2016 - 2018 October - 1200 Web Development <http://1200wd.com/>
+#    © 2016 - 2021 January - 1200 Web Development <http://1200wd.com/>
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU Affero General Public License as
@@ -119,9 +119,8 @@ class TestEncodingMethodsChangeBase(unittest.TestCase):
     def test_encoding_exceptions(self):
         self.assertRaisesRegexp(EncodingError, "Unknown input format {}",
                                 change_base, {}, 4, 2)
-        if PY3:
-            self.assertRaisesRegexp(EncodingError, "Byteint must be a list or defined as bytes",
-                                    varbyteint_to_int, 'fd1027')
+        self.assertRaisesRegexp(EncodingError, "Byteint must be a list or defined as bytes",
+                                varbyteint_to_int, 'fd1027')
         self.assertRaisesRegexp(EncodingError, "Input must be a number type",
                                 int_to_varbyteint, '1000')
         self.assertRaisesRegexp(TypeError, "String value expected", normalize_string, 100)
@@ -135,8 +134,8 @@ class TestEncodingMethodsChangeBase(unittest.TestCase):
 class TestEncodingMethodsAddressConversion(unittest.TestCase):
 
     def test_address_to_pkh_conversion_1(self):
-        self.assertEqual('13d215d212cd5188ae02c5635faabdc4d7d4ec91',
-                         addr_to_pubkeyhash('12ooWd8Xag7hsgP9PBPnmyGe36VeUrpMSH', True))
+        self.assertEqual('cc194d0157dc8c2effb4aaff25a1bbd88a4a29a8',
+                         addr_to_pubkeyhash('1KcBA4i4Qqu1oRjobyWU3R5UXUorLQ3jUg', True))
 
     def test_address_to_pkh_conversion_2(self):
         self.assertEqual('00' * 20,
@@ -147,11 +146,11 @@ class TestEncodingMethodsAddressConversion(unittest.TestCase):
                          addr_to_pubkeyhash('1QLbz7JHiBTspS962RLKV8GndWFwi5j6Qr', False))
 
     def test_pkh_to_addr_conversion_1(self):
-        self.assertEqual('12ooWd8Xag7hsgP9PBPnmyGe36VeUrpMSH',
-                         pubkeyhash_to_addr('13d215d212cd5188ae02c5635faabdc4d7d4ec91'))
+        self.assertEqual('1LkthjzqGyhAWAmA9Dgbyp9pNMBXQj9ZZ3',
+                         pubkeyhash_to_addr('d8b76f6dd0e8d17cd34c3703ad5a120ba83ff857'))
 
     def test_pkh_to_addr_conversion_2(self):
-        self.assertEqual('11111111111111111111111111114oLvT2',
+        self.assertEqual('1111111111111111111114oLvT2',
                          pubkeyhash_to_addr('00' * 20))
 
     def test_address_to_pkh_bech32(self):
@@ -162,6 +161,16 @@ class TestEncodingMethodsAddressConversion(unittest.TestCase):
     def test_pkh_to_bech32_address(self):
         addr = pubkeyhash_to_addr('45d093a97d5710c80363c69618e826efad42edb1', encoding='bech32')
         self.assertEqual(addr, 'bc1qghgf82ta2ugvsqmrc6tp36pxa7k59md3czjhjc')
+
+    def test_address_base58_zero_prefixes(self):
+        self.assertEqual(pubkeyhash_to_addr_base58('00003acd8f60b766e48e9db32093b419c21de7e9'),
+                         '111GxfgFVyDW3zcFpUF1upSZoL7GCRiLk')
+        self.assertEqual(change_base('000000003acd8f60b766e48e9db32093b419c21de7e9b35f7e0d', 16, 58), '1111GxfgFVyDW3zcFpUF1upSZoL7GCRiLk')
+        self.assertEqual(change_base('0000003acd8f60b766e48e9db32093b419c21de7e9b35f7e0d', 16, 58), '111GxfgFVyDW3zcFpUF1upSZoL7GCRiLk')
+        self.assertEqual(change_base('1111GxfgFVyDW3zcFpUF1upSZoL7GCRiLk', 58, 256).hex(),
+                         '000000003acd8f60b766e48e9db32093b419c21de7e9b35f7e0d')
+        self.assertRaisesRegexp(EncodingError, "Invalid address hash160 length, should be 25 characters not",
+                                addr_base58_to_pubkeyhash, '1111GxfgFVyDW3zcFpUF1upSZoL7GCRiLk')
 
 
 class TestEncodingMethodsStructures(unittest.TestCase):
@@ -212,10 +221,6 @@ class TestEncodingMethodsStructures(unittest.TestCase):
         self.assertEqual(b'\x07\xdcX \xa0\xe5\x18!]!,\xd5\x18\x8a\xe0,V5\xfa\xab',
                          to_bytes(b'07dc5820a0e518215d212cd5188ae02c5635faab'))
 
-    def test_to_bytes_bytearray(self):
-        self.assertEqual(bytearray(b'\x06\x07<F\x00\xff   \xc8\x1b'),
-                         to_bytes(bytearray([6, 7, 60, 70, 0, 255, 32, 32, 32, 200, 27])))
-
     def test_to_hexstring_string(self):
         self.assertEqual('deadbeef', to_hexstring('deadbeef'))
 
@@ -229,10 +234,6 @@ class TestEncodingMethodsStructures(unittest.TestCase):
     def test_to_hexstring_unicode(self):
         self.assertEqual('07dc5820a0e518215d212cd5188ae02c5635faab',
                          to_hexstring(u'07dc5820a0e518215d212cd5188ae02c5635faab'))
-
-    def test_to_hexstring_bytearray(self):
-        self.assertEqual('06073c4600ff202020c81b',
-                         to_hexstring(bytearray([6, 7, 60, 70, 0, 255, 32, 32, 32, 200, 27])))
 
     def test_der_encode_sig(self):
         r = 80828100789555555332401870818771238079532314371107341426356071258591122886343
@@ -335,7 +336,7 @@ class TestEncodingBech32SegwitAddresses(unittest.TestCase):
                 scriptpubkey = addr_bech32_to_pubkeyhash(address, include_witver=True)
             except EncodingError:
                 scriptpubkey = addr_bech32_to_pubkeyhash(address, prefix='tb', include_witver=True)
-            self.assertEqual(scriptpubkey, binascii.unhexlify(hexscript))
+            self.assertEqual(scriptpubkey, bytes.fromhex(hexscript))
             addr = pubkeyhash_to_addr_bech32(scriptpubkey, address[:2].lower())
             self.assertEqual(address.lower(), addr)
 
@@ -346,8 +347,6 @@ class TestEncodingBech32SegwitAddresses(unittest.TestCase):
             self.assertRaises(EncodingError, addr_bech32_to_pubkeyhash, "tb", test)
 
     def test_quantity_class(self):
-        if not PY3:
-            self.skipTest("This class is not supported in Python2")
         self.assertEqual(str(Quantity(121608561109507200000, 'H/s', precision=10)), '121.6085611095 EH/s')
         self.assertEqual(str(Quantity(1 / 121608561109507200000, 'ots', precision=10)), '8.2231052722 zots')
         self.assertEqual(str(Quantity(0.0000000001, 'm', precision=2)), '100.00 pm')

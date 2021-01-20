@@ -19,26 +19,17 @@
 #
 
 import os
-import sys
 import locale
 import platform
+import configparser
+import enum
+from pathlib import Path
 from datetime import datetime
 
 # General defaults
-PY3 = sys.version_info[0] == 3
 TYPE_TEXT = str
-if not PY3:
-    TYPE_TEXT = (str, unicode)
 TYPE_INT = int
-if not PY3:
-    TYPE_INT = (int, long)
 LOGLEVEL = 'WARNING'
-if PY3:
-    import configparser
-    from pathlib import Path
-else:
-    import ConfigParser as configparser
-    from pathlib2 import Path
 
 
 # File locations
@@ -102,7 +93,28 @@ DEFAULT_LANGUAGE = 'english'
 
 # Networks
 DEFAULT_NETWORK = 'bitcoin'
-
+NETWORK_DENOMINATORS = {  # source: https://en.bitcoin.it/wiki/Units, https://en.wikipedia.org/wiki/Metric_prefix
+    0.00000000000001: 'µsat',
+    0.00000000001: 'msat',
+    0.000000001: 'n',
+    0.00000001: 'sat',
+    0.0000001: 'fin',
+    0.000001: 'µ',
+    0.001: 'm',
+    0.01: 'c',
+    0.1: 'd',
+    1: '',
+    10: 'da',
+    100: 'h',
+    1000: 'k',
+    1000000: 'M',
+    1000000000: 'G',
+    1000000000000: 'T',
+    1000000000000000: 'P',
+    1000000000000000000: 'E',
+    1000000000000000000000: 'Z',
+    1000000000000000000000000: 'Y',
+}
 
 if os.name == 'nt' and locale.getpreferredencoding() != 'UTF-8':
     # TODO: Find a better windows hack
@@ -190,7 +202,6 @@ UNITTESTS_FULL_DATABASE_TEST = False
 
 # CACHING
 SERVICE_CACHING_ENABLED = True
-CACHE_STORE_RAW_TRANSACTIONS = False
 
 
 def read_config():
@@ -198,16 +209,10 @@ def read_config():
 
     def config_get(section, var, fallback, is_boolean=False):
         try:
-            if PY3:
-                if is_boolean:
-                    val = config.getboolean(section, var, fallback=fallback)
-                else:
-                    val = config.get(section, var, fallback=fallback)
+            if is_boolean:
+                val = config.getboolean(section, var, fallback=fallback)
             else:
-                if is_boolean:
-                    val = config.getboolean(section, var)
-                else:
-                    val = config.get(section, var)
+                val = config.get(section, var, fallback=fallback)
             return val
         except Exception:
             return fallback
@@ -216,7 +221,7 @@ def read_config():
     global ALLOW_DATABASE_THREADS, DEFAULT_DATABASE_CACHE
     global BCL_LOG_FILE, LOGLEVEL, ENABLE_BITCOINLIB_LOGGING
     global TIMEOUT_REQUESTS, DEFAULT_LANGUAGE, DEFAULT_NETWORK, DEFAULT_WITNESS_TYPE
-    global UNITTESTS_FULL_DATABASE_TEST, SERVICE_CACHING_ENABLED, CACHE_STORE_RAW_TRANSACTIONS
+    global UNITTESTS_FULL_DATABASE_TEST, SERVICE_CACHING_ENABLED
     global SERVICE_MAX_ERRORS, BLOCK_COUNT_CACHE_TIME, MAX_TRANSACTIONS
 
     # Read settings from Configuration file provided in OS environment~/.bitcoinlib/ directory
@@ -265,14 +270,10 @@ def read_config():
     DEFAULT_NETWORK = config_get('common', 'default_network', fallback=DEFAULT_NETWORK)
     DEFAULT_WITNESS_TYPE = config_get('common', 'default_witness_type', fallback=DEFAULT_WITNESS_TYPE)
 
-    CACHE_STORE_RAW_TRANSACTIONS = config_get('common', 'cache_store_raw_transactions', fallback=True, is_boolean=True)
-
-    # Convert paths to strings
-
     full_db_test = os.environ.get('UNITTESTS_FULL_DATABASE_TEST')
     if full_db_test:
-        if full_db_test in [0, False, 'False', 'false', 'FALSE']:
-            UNITTESTS_FULL_DATABASE_TEST = False
+        if full_db_test in [1, True, 'True', 'true', 'TRUE']:
+            UNITTESTS_FULL_DATABASE_TEST = True
 
     if not data:
         return False
@@ -307,7 +308,8 @@ def initialize_lib():
     for file in Path(BCL_INSTALL_DIR, 'data').iterdir():
         if file.suffix not in ['.ini', '.json']:
             continue
-        copyfile(str(file), str(Path(BCL_DATA_DIR, file.name)))
+        copyfile(str(file), Path(BCL_DATA_DIR, file.name))
+
 
 # Initialize library
 read_config()
